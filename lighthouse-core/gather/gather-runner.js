@@ -185,25 +185,26 @@ class GatherRunner {
   /**
    * Navigates to about:blank and calls beforePass() on gatherers before tracing
    * has started and before navigation to the target page.
-   * @param {!Object} options
+   * @param {!Object} context
    * @param {!GathererResults} gathererResults
    * @return {!Promise}
    */
-  static beforePass(options, gathererResults) {
-    const blockedUrls = (options.config.blockedUrlPatterns || [])
-      .concat(options.flags.blockedUrlPatterns || []);
-    const blankPage = options.config.blankPage;
-    const blankDuration = options.config.blankDuration;
-    const pass = GatherRunner.loadBlank(options.driver, blankPage, blankDuration)
+  static beforePass(context, gathererResults) {
+    const blockedUrls = (context.config.blockedUrlPatterns || [])
+      .concat(context.flags.blockedUrlPatterns || []);
+    const blankPage = context.config.blankPage;
+    const blankDuration = context.config.blankDuration;
+    const pass = GatherRunner.loadBlank(context.driver, blankPage, blankDuration)
         // Set request blocking before any network activity
         // No "clearing" is done at the end of the pass since blockUrlPatterns([]) will unset all if
         // neccessary at the beginning of the next pass.
-        .then(() => options.driver.blockUrlPatterns(blockedUrls))
-        .then(() => options.driver.setExtraHTTPHeaders(options.flags.extraHeaders));
+        .then(() => context.driver.blockUrlPatterns(blockedUrls))
+        .then(() => context.driver.setExtraHTTPHeaders(context.flags.extraHeaders));
 
-    return options.config.gatherers.reduce((chain, gatherer) => {
+    return context.config.gatherers.reduce((chain, gathererDefn) => {
       return chain.then(_ => {
-        const artifactPromise = Promise.resolve().then(_ => gatherer.beforePass(options));
+        const gatherer = gathererDefn.instance;
+        const artifactPromise = Promise.resolve().then(_ => gatherer.beforePass(context));
         gathererResults[gatherer.name] = [artifactPromise];
         return GatherRunner.recoverOrThrow(artifactPromise);
       });
@@ -225,7 +226,7 @@ class GatherRunner {
     const recordTrace = config.recordTrace;
     const isPerfRun = !options.flags.disableStorageReset && recordTrace && config.useThrottling;
 
-    const gatherernames = gatherers.map(g => g.name).join(', ');
+    const gatherernames = gatherers.map(g => g.instance.name).join(', ');
     const status = 'Loading page & waiting for onload';
     log.log('status', status, gatherernames);
 
@@ -240,8 +241,9 @@ class GatherRunner {
       .then(_ => GatherRunner.loadPage(driver, options))
       .then(_ => log.log('statusEnd', status));
 
-    return gatherers.reduce((chain, gatherer) => {
+    return gatherers.reduce((chain, gathererDefn) => {
       return chain.then(_ => {
+        const gatherer = gathererDefn.instance;
         const artifactPromise = Promise.resolve().then(_ => gatherer.pass(options));
         gathererResults[gatherer.name].push(artifactPromise);
         return GatherRunner.recoverOrThrow(artifactPromise);
@@ -305,7 +307,8 @@ class GatherRunner {
     // Disable throttling so the afterPass analysis isn't throttled
     pass = pass.then(_ => driver.setThrottling(options.flags, {useThrottling: false}));
 
-    pass = gatherers.reduce((chain, gatherer) => {
+    pass = gatherers.reduce((chain, gathererDefn) => {
+      const gatherer = gathererDefn.instance;
       const status = `Retrieving: ${gatherer.name}`;
       return chain.then(_ => {
         log.log('status', status);
@@ -491,14 +494,21 @@ class GatherRunner {
 
   static instantiateGatherers(passes, rootPath) {
     return passes.map(pass => {
-      pass.gatherers = pass.gatherers.map(gatherer => {
+      pass.gatherers = pass.gatherers.map(gathererDefn => {
         // If this is already instantiated, don't do anything else.
-        if (typeof gatherer !== 'string') {
-          return gatherer;
+        if (gathererDefn.instance) {
+          return gathererDefn;
         }
 
-        const GathererClass = GatherRunner.getGathererClass(gatherer, rootPath);
-        return new GathererClass();
+        if (typeof gathererDefn.beforePass === 'function') {
+          return {instance: gathererDefn, options: {}};
+        }
+
+        const gathererPath = typeof gathererDefn === 'string' ? gathererDefn : gathererDefn.path;
+        const GathererClass = GatherRunner.getGathererClass(
+          gathererDefn.implementation || gathererPath, rootPath);
+        gathererDefn.instance = new GathererClass();
+        return gathererDefn;
       });
 
       return pass;

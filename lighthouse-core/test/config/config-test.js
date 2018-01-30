@@ -51,8 +51,8 @@ describe('Config', () => {
       audits: [MyAudit],
     };
     const newConfig = new Config(config);
-    assert.equal(MyGatherer, newConfig.passes[0].gatherers[0]);
-    assert.equal(MyAudit, newConfig.audits[0]);
+    assert.equal(MyGatherer, newConfig.passes[0].gatherers[0].implementation);
+    assert.equal(MyAudit, newConfig.audits[0].implementation);
   });
 
   it('uses the default config when no config is provided', () => {
@@ -126,7 +126,7 @@ describe('Config', () => {
 
     assert.ok(Array.isArray(config.audits));
     assert.equal(config.audits.length, 1);
-    return assert.equal(typeof config.audits[0], 'function');
+    return assert.equal(typeof config.audits[0].implementation, 'function');
   });
 
   it('throws when an audit is not found', () => {
@@ -435,7 +435,7 @@ describe('Config', () => {
       ],
     });
 
-    const auditNames = new Set(config.audits.map(audit => audit.meta.name));
+    const auditNames = new Set(config.audits.map(audit => audit.implementation.meta.name));
     assert.ok(config, 'failed to generate config');
     assert.ok(auditNames.has('custom-audit'), 'did not include custom audit');
     assert.ok(auditNames.has('unused-css-rules'), 'did not include full audits');

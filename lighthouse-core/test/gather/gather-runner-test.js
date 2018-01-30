@@ -417,7 +417,7 @@ describe('GatherRunner', function() {
     const config = {
       recordTrace: true,
       gatherers: [
-        new TestGatherer(),
+        {instance: new TestGatherer()},
       ],
     };
     const flags = {};
@@ -442,7 +442,7 @@ describe('GatherRunner', function() {
     const config = {
       recordTrace: true,
       gatherers: [
-        new TestGatherer(),
+        {instance: new TestGatherer()},
       ],
     };
 
@@ -466,7 +466,7 @@ describe('GatherRunner', function() {
 
     const config = {
       gatherers: [
-        new TestGatherer(),
+        {instance: new TestGatherer()},
       ],
     };
     const flags = {};
@@ -492,7 +492,7 @@ describe('GatherRunner', function() {
 
     const config = {
       gatherers: [
-        new TestGatherer(),
+        {instance: new TestGatherer()},
       ],
     };
 
