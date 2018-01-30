@@ -357,8 +357,8 @@ class Config {
   }
 
   /**
-   * @param {!Array<string|!Audit>} audits
-   * @return {!Array<Config.AuditWithOptions>}
+   * @param {?Array<string|!Audit>} audits
+   * @return {?Array<Config.AuditWithOptions>}
    */
   static expandAuditShorthandAndMergeOptions(audits) {
     if (!audits) {
@@ -379,8 +379,8 @@ class Config {
   }
 
   /**
-   * @param {!Array<!Pass>} passes
-   * @return {!Array<!Pass>} passes
+   * @param {?Array<!Pass>} passes
+   * @return {?Array<!Pass>} passes
    */
   static expandGathererShorthandAndMergeOptions(passes) {
     if (!passes) {
@@ -436,7 +436,7 @@ class Config {
     // 0. Clone config to avoid mutating it
     const config = deepClone(oldConfig);
     config.audits = Config.expandAuditShorthandAndMergeOptions(config.audits);
-    config.passes = Config.expandAuditShorthandAndMergeOptions(config.passes);
+    config.passes = Config.expandGathererShorthandAndMergeOptions(config.passes);
 
     // 1. Filter to just the chosen categories
     config.categories = Config.filterCategoriesAndAudits(config.categories, categoryIds, auditIds,
@@ -591,13 +591,12 @@ class Config {
 
   /**
    * Filters to only required passes and gatherers, returning a new passes object
-   * @param {!Object} oldPasses
+   * @param {!Object} passes
    * @param {!Set<string>} requiredGatherers
    * @return {!Object} fresh passes object
    */
-  static generatePassesNeededByGatherers(oldPasses, requiredGatherers) {
+  static generatePassesNeededByGatherers(passes, requiredGatherers) {
     const auditsNeedTrace = requiredGatherers.has('traces');
-    const passes = Config.expandGathererShorthandAndMergeOptions(deepClone(oldPasses));
     const filteredPasses = passes.map(pass => {
       // remove any unncessary gatherers from within the passes
       pass.gatherers = pass.gatherers.filter(gathererDefn => {

@@ -126,7 +126,9 @@ describe('Config', () => {
 
     assert.ok(Array.isArray(config.audits));
     assert.equal(config.audits.length, 1);
-    return assert.equal(typeof config.audits[0].implementation, 'function');
+    assert.equal(config.audits[0].path, 'user-timings');
+    assert.equal(typeof config.audits[0].implementation, 'function');
+    assert.deepEqual(config.audits[0].options, {});
   });
 
   it('throws when an audit is not found', () => {

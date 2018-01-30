@@ -479,6 +479,10 @@ class GatherRunner {
   }
 
   static assertValidGatherer(GathererDefinition, gathererName) {
+    if (typeof GathererDefinition !== 'function') {
+      throw new Error(`${gathererName || GathererDefinition} is not a Gatherer class`);
+    }
+
     const gathererInstance = new GathererDefinition();
     gathererName = gathererName || gathererInstance.name || 'gatherer';
 
