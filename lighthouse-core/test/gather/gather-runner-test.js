@@ -742,6 +742,48 @@ describe('GatherRunner', function() {
       });
     });
 
+    it('passes gatherer options', () => {
+      const calls = {beforePass: [], pass: [], afterPass: []};
+      class EavesdropGatherer extends Gatherer {
+        beforePass(context) {
+          calls.beforePass.push(context.options);
+        }
+        pass(context) {
+          calls.pass.push(context.options);
+        }
+        afterPass(context) {
+          calls.afterPass.push(context.options);
+          return context.options.x || 'none';
+        }
+      }
+
+      const gatherers = [
+        {instance: new class EavesdropGatherer1 extends EavesdropGatherer {}(), options: {x: 1}},
+        {instance: new class EavesdropGatherer2 extends EavesdropGatherer {}(), options: {x: 2}},
+        {instance: new class EavesdropGatherer3 extends EavesdropGatherer {}()},
+      ];
+
+      const passes = [{blankDuration: 0, gatherers}];
+      return GatherRunner.run(passes, {
+        driver: fakeDriver,
+        url: 'https://example.com',
+        flags: {},
+        config: new Config({}),
+      }).then(artifacts => {
+        assert.equal(artifacts.EavesdropGatherer1, 1);
+        assert.equal(artifacts.EavesdropGatherer2, 2);
+        assert.equal(artifacts.EavesdropGatherer3, 'none');
+
+        // assert that all three phases received the gatherer options expected
+        const expectedOptions = [{x: 1}, {x: 2}, {}];
+        for (let i = 0; i < 3; i++) {
+          assert.deepEqual(calls.beforePass[i], expectedOptions[i]);
+          assert.deepEqual(calls.pass[i], expectedOptions[i]);
+          assert.deepEqual(calls.afterPass[i], expectedOptions[i]);
+        }
+      });
+    });
+
     it('uses the last not-undefined phase result as artifact', () => {
       const recoverableError = new Error('My recoverable error');
       const someOtherError = new Error('Bad, bad error.');

@@ -244,7 +244,7 @@ class Runner {
         }
       }
       // all required artifacts are in good shape, so we proceed
-      return audit.audit(artifacts, auditDefn.options || {});
+      return audit.audit(artifacts, {options: auditDefn.options || {}});
     // Fill remaining audit result fields.
     }).then(auditResult => Audit.generateAuditResult(audit, auditResult))
     .catch(err => {

@@ -204,6 +204,7 @@ class GatherRunner {
     return context.config.gatherers.reduce((chain, gathererDefn) => {
       return chain.then(_ => {
         const gatherer = gathererDefn.instance;
+        context.options = gathererDefn.options || {};
         const artifactPromise = Promise.resolve().then(_ => gatherer.beforePass(context));
         gathererResults[gatherer.name] = [artifactPromise];
         return GatherRunner.recoverOrThrow(artifactPromise);
@@ -214,17 +215,17 @@ class GatherRunner {
   /**
    * Navigates to requested URL and then runs pass() on gatherers while trace
    * (if requested) is still being recorded.
-   * @param {!Object} options
+   * @param {!Object} context
    * @param {!GathererResults} gathererResults
    * @return {!Promise}
    */
-  static pass(options, gathererResults) {
-    const driver = options.driver;
-    const config = options.config;
+  static pass(context, gathererResults) {
+    const driver = context.driver;
+    const config = context.config;
     const gatherers = config.gatherers;
 
     const recordTrace = config.recordTrace;
-    const isPerfRun = !options.flags.disableStorageReset && recordTrace && config.useThrottling;
+    const isPerfRun = !context.flags.disableStorageReset && recordTrace && config.useThrottling;
 
     const gatherernames = gatherers.map(g => g.instance.name).join(', ');
     const status = 'Loading page & waiting for onload';
@@ -236,15 +237,16 @@ class GatherRunner {
       // Always record devtoolsLog
       .then(_ => driver.beginDevtoolsLog())
       // Begin tracing if requested by config.
-      .then(_ => recordTrace && driver.beginTrace(options.flags))
+      .then(_ => recordTrace && driver.beginTrace(context.flags))
       // Navigate.
-      .then(_ => GatherRunner.loadPage(driver, options))
+      .then(_ => GatherRunner.loadPage(driver, context))
       .then(_ => log.log('statusEnd', status));
 
     return gatherers.reduce((chain, gathererDefn) => {
       return chain.then(_ => {
         const gatherer = gathererDefn.instance;
-        const artifactPromise = Promise.resolve().then(_ => gatherer.pass(options));
+        context.options = gathererDefn.options || {};
+        const artifactPromise = Promise.resolve().then(_ => gatherer.pass(context));
         gathererResults[gatherer.name].push(artifactPromise);
         return GatherRunner.recoverOrThrow(artifactPromise);
       });
@@ -255,13 +257,13 @@ class GatherRunner {
    * Ends tracing and collects trace data (if requested for this pass), and runs
    * afterPass() on gatherers with trace data passed in. Promise resolves with
    * object containing trace and network data.
-   * @param {!Object} options
+   * @param {!Object} context
    * @param {!GathererResults} gathererResults
    * @return {!Promise}
    */
-  static afterPass(options, gathererResults) {
-    const driver = options.driver;
-    const config = options.config;
+  static afterPass(context, gathererResults) {
+    const driver = context.driver;
+    const config = context.config;
     const gatherers = config.gatherers;
     const passData = {};
 
@@ -289,7 +291,7 @@ class GatherRunner {
       const networkRecords = NetworkRecorder.recordsFromLogs(devtoolsLog);
       log.verbose('statusEnd', status);
 
-      pageLoadError = GatherRunner.getPageLoadError(options.url, networkRecords);
+      pageLoadError = GatherRunner.getPageLoadError(context.url, networkRecords);
       // If the driver was offline, a page load error is expected, so do not save it.
       if (!driver.online) pageLoadError = null;
 
@@ -305,16 +307,17 @@ class GatherRunner {
     });
 
     // Disable throttling so the afterPass analysis isn't throttled
-    pass = pass.then(_ => driver.setThrottling(options.flags, {useThrottling: false}));
+    pass = pass.then(_ => driver.setThrottling(context.flags, {useThrottling: false}));
 
     pass = gatherers.reduce((chain, gathererDefn) => {
       const gatherer = gathererDefn.instance;
       const status = `Retrieving: ${gatherer.name}`;
       return chain.then(_ => {
         log.log('status', status);
+        context.options = gathererDefn.options || {};
         const artifactPromise = pageLoadError ?
           Promise.reject(pageLoadError) :
-          Promise.resolve().then(_ => gatherer.afterPass(options, passData));
+          Promise.resolve().then(_ => gatherer.afterPass(context, passData));
         gathererResults[gatherer.name].push(artifactPromise);
         return GatherRunner.recoverOrThrow(artifactPromise);
       }).then(_ => {
@@ -409,12 +412,12 @@ class GatherRunner {
         // If the main document redirects, we'll update this to keep track
         let urlAfterRedirects;
         return passes.reduce((chain, config, passIndex) => {
-          const runOptions = Object.assign({}, options, {config});
+          const runContext = Object.assign({}, options, {config});
           return chain
             .then(_ => driver.setThrottling(options.flags, config))
-            .then(_ => GatherRunner.beforePass(runOptions, gathererResults))
-            .then(_ => GatherRunner.pass(runOptions, gathererResults))
-            .then(_ => GatherRunner.afterPass(runOptions, gathererResults))
+            .then(_ => GatherRunner.beforePass(runContext, gathererResults))
+            .then(_ => GatherRunner.pass(runContext, gathererResults))
+            .then(_ => GatherRunner.afterPass(runContext, gathererResults))
             .then(passData => {
               const passName = config.passName || Audit.DEFAULT_PASS;
 
@@ -427,7 +430,7 @@ class GatherRunner {
               }
 
               if (passIndex === 0) {
-                urlAfterRedirects = runOptions.url;
+                urlAfterRedirects = runContext.url;
               }
             });
         }, Promise.resolve()).then(_ => {
