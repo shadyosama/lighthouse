@@ -10,7 +10,6 @@ const defaultConfigPath = './default.js';
 const defaultConfig = require('./default.js');
 const fullConfig = require('./full-config.js');
 
-const GatherRunner = require('../gather/gather-runner');
 const log = require('lighthouse-logger');
 const path = require('path');
 const Audit = require('../audits/audit');
@@ -101,7 +100,7 @@ function cleanTrace(trace) {
   return trace;
 }
 
-function validatePasses(passes, audits, rootPath) {
+function validatePasses(passes, audits) {
   if (!Array.isArray(passes)) {
     return;
   }
@@ -110,11 +109,10 @@ function validatePasses(passes, audits, rootPath) {
   // Log if we are running gathers that are not needed by the audits listed in the config
   passes.forEach(pass => {
     pass.gatherers.forEach(gathererDefn => {
-      const gatherer = gathererDefn.implementation || gathererDefn.path;
-      const GathererClass = GatherRunner.getGathererClass(gatherer, rootPath);
-      const isGatherRequiredByAudits = requiredGatherers.has(GathererClass.name);
+      const gatherer = gathererDefn.instance || gathererDefn.implementation;
+      const isGatherRequiredByAudits = requiredGatherers.has(gatherer.name);
       if (isGatherRequiredByAudits === false) {
-        const msg = `${GathererClass.name} gatherer requested, however no audit requires it.`;
+        const msg = `${gatherer.name} gatherer requested, however no audit requires it.`;
         log.warn('config', msg);
       }
     });
@@ -338,15 +336,14 @@ class Config {
     // Store the directory of the config path, if one was provided.
     this._configDir = configPath ? path.dirname(configPath) : undefined;
 
-    this._passes = configJSON.passes || null;
-
+    this._passes = Config.requireGatherers(configJSON.passes);
     this._audits = Config.requireAudits(configJSON.audits, this._configDir);
     this._artifacts = expandArtifacts(configJSON.artifacts);
     this._categories = configJSON.categories;
     this._groups = configJSON.groups;
 
     // validatePasses must follow after audits are required
-    validatePasses(configJSON.passes, this._audits, this._configDir);
+    validatePasses(configJSON.passes, this._audits);
     validateCategories(configJSON.categories, this._audits, this._groups);
   }
 
@@ -453,6 +450,7 @@ class Config {
     const config = deepClone(oldConfig);
     config.audits = Config.expandAuditShorthandAndMergeOptions(config.audits);
     config.passes = Config.expandGathererShorthandAndMergeOptions(config.passes);
+    config.passes = Config.requireGatherers(config.passes);
 
     // 1. Filter to just the chosen categories
     config.categories = Config.filterCategoriesAndAudits(config.categories, categoryIds, auditIds,
@@ -616,9 +614,8 @@ class Config {
     const filteredPasses = passes.map(pass => {
       // remove any unncessary gatherers from within the passes
       pass.gatherers = pass.gatherers.filter(gathererDefn => {
-        const gatherer = gathererDefn.implementation || gathererDefn.path;
-        const gathererName = GatherRunner.getGathererClass(gatherer).name;
-        return requiredGatherers.has(gathererName);
+        const gatherer = gathererDefn.instance || gathererDefn.implementation;
+        return requiredGatherers.has(gatherer.name);
       });
 
       // disable the trace if no audit requires a trace
@@ -672,14 +669,17 @@ class Config {
     });
   }
 
-
   /**
    *
-   * @param {!Array<{gatherers: !Array}>} passes
+   * @param {?Array<{gatherers: !Array}>} passes
    * @param {string=} configPath
-   * @return {!Array<{gatherers: !Array}>}
+   * @return {?Array<{gatherers: !Array}>}
    */
   static requireGatherers(passes, configPath) {
+    if (!passes) {
+      return null;
+    }
+
     const coreList = Runner.getGathererList();
     passes.forEach(pass => {
       pass.gatherers.forEach(gathererDefn => {
@@ -690,7 +690,7 @@ class Config {
             const name = gathererDefn.path;
             const coreGatherer = coreList.find(a => a === `${name}.js`);
 
-            let requirePath = `./gatherers/${name}`;
+            let requirePath = `../gather/gatherers/${name}`;
             if (!coreGatherer) {
               // Otherwise, attempt to find it elsewhere. This throws if not found.
               requirePath = Runner.resolvePlugin(name, configPath, 'gatherer');

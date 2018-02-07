@@ -228,7 +228,6 @@ class GatherRunner {
     return passContext.config.gatherers.reduce((chain, gathererDefn) => {
       return chain.then(_ => {
         const gatherer = gathererDefn.instance;
-        //
         passContext.options = gathererDefn.options || {};
         const artifactPromise = Promise.resolve().then(_ => gatherer.beforePass(passContext));
         gathererResults[gatherer.name] = [artifactPromise];
@@ -421,8 +420,6 @@ class GatherRunner {
     if (typeof options.flags.disableCpuThrottling === 'undefined') {
       options.flags.disableCpuThrottling = false;
     }
-
-    passes = this.instantiateGatherers(passes, options.config.configDir);
 
     const gathererResults = {
       LighthouseRunWarnings: [],
