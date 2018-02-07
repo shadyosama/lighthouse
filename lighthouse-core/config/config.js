@@ -210,6 +210,22 @@ function assertValidAudit(auditDefinition, auditPath) {
   }
 }
 
+function assertValidGatherer(gathererInstance, gathererName) {
+  gathererName = gathererName || gathererInstance.name || 'gatherer';
+
+  if (typeof gathererInstance.beforePass !== 'function') {
+    throw new Error(`${gathererName} has no beforePass() method.`);
+  }
+
+  if (typeof gathererInstance.pass !== 'function') {
+    throw new Error(`${gathererName} has no pass() method.`);
+  }
+
+  if (typeof gathererInstance.afterPass !== 'function') {
+    throw new Error(`${gathererName} has no afterPass() method.`);
+  }
+}
+
 function expandArtifacts(artifacts) {
   if (!artifacts) {
     return null;
@@ -591,9 +607,9 @@ class Config {
 
   /**
    * Filters to only required passes and gatherers, returning a new passes object
-   * @param {!Object} passes
+   * @param {!Array} passes
    * @param {!Set<string>} requiredGatherers
-   * @return {!Object} fresh passes object
+   * @return {!Array} fresh passes object
    */
   static generatePassesNeededByGatherers(passes, requiredGatherers) {
     const auditsNeedTrace = requiredGatherers.has('traces');
@@ -629,7 +645,7 @@ class Config {
    * leaving only an array of Audits.
    * @param {?Array<!Config.AuditWithOptions>} audits
    * @param {string=} configPath
-   * @return {?Array<!Audit>}
+   * @return {?Array<!Config.AuditWithOptions>}
    */
   static requireAudits(audits, configPath) {
     if (!audits) {
@@ -654,6 +670,44 @@ class Config {
       assertValidAudit(auditDefn.implementation, auditDefn.path);
       return auditDefn;
     });
+  }
+
+
+  /**
+   *
+   * @param {!Array<{gatherers: !Array}>} passes
+   * @param {string=} configPath
+   * @return {!Array<{gatherers: !Array}>}
+   */
+  static requireGatherers(passes, configPath) {
+    const coreList = Runner.getGathererList();
+    passes.forEach(pass => {
+      pass.gatherers.forEach(gathererDefn => {
+        if (!gathererDefn.instance) {
+          let GathererClass = gathererDefn.implementation;
+          if (!GathererClass) {
+            // See if the gatherer is a Lighthouse core gatherer
+            const name = gathererDefn.path;
+            const coreGatherer = coreList.find(a => a === `${name}.js`);
+
+            let requirePath = `./gatherers/${name}`;
+            if (!coreGatherer) {
+              // Otherwise, attempt to find it elsewhere. This throws if not found.
+              requirePath = Runner.resolvePlugin(name, configPath, 'gatherer');
+            }
+
+            GathererClass = require(requirePath);
+          }
+
+          gathererDefn.implementation = GathererClass;
+          gathererDefn.instance = new GathererClass();
+        }
+
+        assertValidGatherer(gathererDefn.instance, gathererDefn.path);
+      });
+    });
+
+    return passes;
   }
 
   /** @type {string} */

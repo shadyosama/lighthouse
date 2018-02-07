@@ -56,6 +56,9 @@ function getMockedEmulationDriver(emulationFn, netThrottleFn, cpuThrottleFn,
     getUserAgent() {
       return Promise.resolve('Fake user agent');
     }
+    waitForLoadEvent() {
+      return Promise.resolve();
+    }
   };
   const EmulationMock = class extends Connection {
     sendCommand(command, params) {
@@ -255,6 +258,8 @@ describe('GatherRunner', function() {
       dismissJavaScriptDialogs: asyncFunc,
       enableRuntimeEvents: asyncFunc,
       cacheNatives: asyncFunc,
+      gotoURL: asyncFunc,
+      waitForLoadEvent: asyncFunc,
       registerPerformanceObserver: asyncFunc,
       cleanBrowserCaches: createCheck('calledCleanBrowserCaches'),
       clearDataForOrigin: createCheck('calledClearStorage'),
@@ -314,6 +319,8 @@ describe('GatherRunner', function() {
       dismissJavaScriptDialogs: asyncFunc,
       enableRuntimeEvents: asyncFunc,
       cacheNatives: asyncFunc,
+      gotoURL: asyncFunc,
+      waitForLoadEvent: asyncFunc,
       registerPerformanceObserver: asyncFunc,
       cleanBrowserCaches: createCheck('calledCleanBrowserCaches'),
       clearDataForOrigin: createCheck('calledClearStorage'),
@@ -676,14 +683,16 @@ describe('GatherRunner', function() {
       const url = 'http://the-page.com';
       const records = [{url, failed: true, localizedFailDescription: 'foobar'}];
       const error = GatherRunner.getPageLoadError(url, records);
-      assert.ok(error && /Unable.*foobar/.test(error.message));
+      assert.equal(error.message, 'FAILED_DOCUMENT_REQUEST');
+      assert.ok(/Your page failed to load/.test(error.friendlyMessage));
     });
 
     it('throws when page times out', () => {
       const url = 'http://the-page.com';
       const records = [];
       const error = GatherRunner.getPageLoadError(url, records);
-      assert.ok(error && /Unable.*no document request/.test(error.message));
+      assert.equal(error.message, 'NO_DOCUMENT_REQUEST');
+      assert.ok(/Your page failed to load/.test(error.friendlyMessage));
     });
   });
 
