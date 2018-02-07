@@ -228,6 +228,7 @@ class GatherRunner {
     return passContext.config.gatherers.reduce((chain, gathererDefn) => {
       return chain.then(_ => {
         const gatherer = gathererDefn.instance;
+        // Abuse the passContext to pass through gatherer options
         passContext.options = gathererDefn.options || {};
         const artifactPromise = Promise.resolve().then(_ => gatherer.beforePass(passContext));
         gathererResults[gatherer.name] = [artifactPromise];
@@ -269,6 +270,7 @@ class GatherRunner {
     return gatherers.reduce((chain, gathererDefn) => {
       return chain.then(_ => {
         const gatherer = gathererDefn.instance;
+        // Abuse the passContext to pass through gatherer options
         passContext.options = gathererDefn.options || {};
         const artifactPromise = Promise.resolve().then(_ => gatherer.pass(passContext));
         gathererResults[gatherer.name].push(artifactPromise);
@@ -338,6 +340,7 @@ class GatherRunner {
       const status = `Retrieving: ${gatherer.name}`;
       return chain.then(_ => {
         log.log('status', status);
+        // Abuse the passContext to pass through gatherer options
         passContext.options = gathererDefn.options || {};
         const artifactPromise = pageLoadError ?
           Promise.reject(pageLoadError) :
