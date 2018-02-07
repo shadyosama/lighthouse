@@ -370,6 +370,8 @@ class Config {
   }
 
   /**
+   * Expands the audits from user-specified to the internal audit definition format.
+   *
    * @param {?Array<string|!Audit>} audits
    * @return {?Array<Config.AuditWithOptions>}
    */
@@ -392,6 +394,13 @@ class Config {
   }
 
   /**
+   * Expands the gatherers from user-specified to the internal gatherer definition format.
+   *
+   * Input Examples:
+   *  - 'my-gatherer'
+   *  - class MyGatherer extends Gatherer { }
+   *  - {instance: myGathererInstance}
+   *
    * @param {?Array<!Pass>} passes
    * @return {?Array<!Pass>} passes
    */
@@ -745,6 +754,14 @@ class Config {
  * @typedef {Object} Config.AuditWithOptions
  * @property {string=} path
  * @property {!Audit=} implementation
+ * @property {Object=} options
+ */
+
+/**
+ * @typedef {Object} Config.GathererWithOptions
+ * @property {string=} path
+ * @property {!Gatherer=} instance
+ * @property {!GathererConstructor=} implementation
  * @property {Object=} options
  */
 
